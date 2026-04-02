@@ -1,0 +1,11 @@
+D:\aprog\TelegramNotifier\src\SimpleApp\bin\Debug\net8.0\SimpleApp.deps.json
+D:\aprog\TelegramNotifier\src\SimpleApp\bin\Debug\net8.0\SimpleApp.dll
+D:\aprog\TelegramNotifier\src\SimpleApp\bin\Debug\net8.0\SimpleApp.pdb
+D:\aprog\TelegramNotifier\src\SimpleApp\obj\Debug\net8.0\SimpleApp.GeneratedMSBuildEditorConfig.editorconfig
+D:\aprog\TelegramNotifier\src\SimpleApp\obj\Debug\net8.0\SimpleApp.AssemblyInfoInputs.cache
+D:\aprog\TelegramNotifier\src\SimpleApp\obj\Debug\net8.0\SimpleApp.AssemblyInfo.cs
+D:\aprog\TelegramNotifier\src\SimpleApp\obj\Debug\net8.0\SimpleApp.csproj.CoreCompileInputs.cache
+D:\aprog\TelegramNotifier\src\SimpleApp\obj\Debug\net8.0\SimpleApp.dll
+D:\aprog\TelegramNotifier\src\SimpleApp\obj\Debug\net8.0\refint\SimpleApp.dll
+D:\aprog\TelegramNotifier\src\SimpleApp\obj\Debug\net8.0\SimpleApp.pdb
+D:\aprog\TelegramNotifier\src\SimpleApp\obj\Debug\net8.0\ref\SimpleApp.dll

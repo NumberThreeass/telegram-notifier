@@ -35,6 +35,24 @@ jobs:
         run: dotnet test --configuration Release --no-build --verbosity normal
         continue-on-error: true
 
+      # ========== ОТЛАДОЧНЫЙ ШАГ: проверяем, что секреты передаются ==========
+      - name: Отладка секретов Telegram
+        run: |
+          if [ -n "$CHAT_ID" ]; then
+            echo "✅ TELEGRAM_CHAT_ID задан, длина: ${#CHAT_ID}, значение: $CHAT_ID"
+          else
+            echo "❌ TELEGRAM_CHAT_ID НЕ ЗАДАН или пуст"
+          fi
+          if [ -n "$BOT_TOKEN" ]; then
+            echo "✅ TELEGRAM_BOT_TOKEN задан, длина: ${#BOT_TOKEN}"
+          else
+            echo "❌ TELEGRAM_BOT_TOKEN НЕ ЗАДАН или пуст"
+          fi
+        env:
+          CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+
+      # ========== УВЕДОМЛЕНИЕ ОБ УСПЕХЕ ==========
       - name: Уведомление об успехе
         if: steps.tests.outcome == 'success'
         uses: appleboy/telegram-action@master
@@ -52,6 +70,7 @@ jobs:
             
             Все тесты пройдены!
 
+      # ========== УВЕДОМЛЕНИЕ ОБ ОШИБКЕ ==========
       - name: Уведомление об ошибке
         if: steps.tests.outcome != 'success'
         uses: appleboy/telegram-action@master

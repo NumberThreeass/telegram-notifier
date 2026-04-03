@@ -34,7 +34,8 @@
               "RelativeToolTip": "tests\\SimpleApp.Tests\\UnitTest1.cs",
               "ViewState": "AgIAABMAAAAAAAAAAAAgwDkAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-04-02T09:27:37.88Z"
+              "WhenOpened": "2026-04-02T09:27:37.88Z",
+              "EditorCaption": ""
             },
             {
               "$type": "Document",
@@ -59,7 +60,8 @@
               "RelativeToolTip": "src\\SimpleApp\\Class1.cs",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAAAYAAAArAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-04-02T09:22:16.651Z"
+              "WhenOpened": "2026-04-02T09:22:16.651Z",
+              "EditorCaption": ""
             }
           ]
         }

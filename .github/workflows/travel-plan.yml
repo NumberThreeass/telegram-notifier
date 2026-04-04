@@ -93,7 +93,6 @@ jobs:
             exit 1
           fi
           RESPONSE=$(curl -s "https://api.openweathermap.org/data/2.5/weather?id=$CITY_ID&appid=$API_KEY&units=metric&lang=ru")
-          # Проверяем, не вернулась ли ошибка
           if echo "$RESPONSE" | jq -e '.cod != 200' > /dev/null 2>&1; then
             echo "❌ Ошибка OpenWeatherMap: $(echo "$RESPONSE" | jq -r '.message')"
             exit 1
@@ -116,8 +115,10 @@ jobs:
           fi
           PACKING=""
           while IFS= read -r item; do
-            PACKING="${PACKING}• ${item}\n"
+            PACKING="${PACKING}• ${item}%0A"
           done <<< "$ITEMS"
+          # Удаляем последний %0A
+          PACKING=${PACKING%\%0A}
           echo "list=$PACKING" >> $GITHUB_OUTPUT
 
       # ========== БЮДЖЕТ ==========
@@ -142,8 +143,9 @@ jobs:
           TIPS=$(yq eval '.travel_tips.общие[]' travel_config.yaml)
           TIPS_TEXT=""
           while IFS= read -r tip; do
-            TIPS_TEXT="${TIPS_TEXT}• ${tip}\n"
+            TIPS_TEXT="${TIPS_TEXT}• ${tip}%0A"
           done <<< "$TIPS"
+          TIPS_TEXT=${TIPS_TEXT%\%0A}
           echo "text=$TIPS_TEXT" >> $GITHUB_OUTPUT
 
       # ========== ФОРМИРУЕМ СООБЩЕНИЕ (HTML) ==========
@@ -159,12 +161,14 @@ jobs:
           PACKING="${{ steps.packing.outputs.list }}"
           TIPS="${{ steps.tips.outputs.text }}"
 
-          MESSAGE="<b>✈️ ПЛАН ПУТЕШЕСТВИЯ В ${DEST^^}</b>%0A%0A"
+          # Делаем первую букву города заглавной
+          DEST_CAPS=$(echo "$DEST" | awk '{print toupper(substr($0,1,1)) tolower(substr($0,2))}')
+          MESSAGE="<b>✈️ ПЛАН ПУТЕШЕСТВИЯ В ${DEST_CAPS}</b>%0A%0A"
           MESSAGE="${MESSAGE}📅 Длительность: ${DAYS} дней%0A"
           MESSAGE="${MESSAGE}🌤️ Погода: ${TEMP}°C, ${DESC}%0A%0A"
           MESSAGE="${MESSAGE}💰 Бюджет: ${TOTAL} руб%0A"
           MESSAGE="${MESSAGE}${STATUS}%0A%0A"
-          MESSAGE="${MESSAGE}🎒 <b>Что взять:</b>%0A${PACKING}%0A"
+          MESSAGE="${MESSAGE}🎒 <b>Что взять:</b>%0A${PACKING}%0A%0A"
           MESSAGE="${MESSAGE}💡 <b>Советы:</b>%0A${TIPS}"
           echo "full_message=$MESSAGE" >> $GITHUB_OUTPUT
 

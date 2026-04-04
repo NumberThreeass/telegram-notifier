@@ -1,10 +1,9 @@
-
 name: Напоминание о расписании
 
 on:
   schedule:
-    - cron: '30 7 * * 1-5'   # 7:30 UTC, с понедельника по пятницу
-  workflow_dispatch:          # чтобы запускать вручную
+    - cron: '30 7 * * 1-5'   # 7:30 UTC, понедельник–пятница
+  workflow_dispatch:
 
 jobs:
   send-schedule:
@@ -15,6 +14,20 @@ jobs:
 
       - name: Устанавливаем jq
         run: sudo apt-get update && sudo apt-get install -y jq
+
+      # ========== ДИАГНОСТИКА: проверяем секреты ==========
+      - name: 🔍 Проверка секретов Telegram
+        run: |
+          if [ -n "${{ secrets.TELEGRAM_CHAT_ID }}" ]; then
+            echo "✅ TELEGRAM_CHAT_ID задан: ${{ secrets.TELEGRAM_CHAT_ID }}"
+          else
+            echo "❌ TELEGRAM_CHAT_ID НЕ ЗАДАН или пуст!"
+          fi
+          if [ -n "${{ secrets.TELEGRAM_BOT_TOKEN }}" ]; then
+            echo "✅ TELEGRAM_BOT_TOKEN задан (первые 5 символов: ${{ secrets.TELEGRAM_BOT_TOKEN }}...)"
+          else
+            echo "❌ TELEGRAM_BOT_TOKEN НЕ ЗАДАН или пуст!"
+          fi
 
       - name: Определяем день недели
         id: day_of_week
@@ -34,21 +47,46 @@ jobs:
         id: schedule
         run: |
           DAY="${{ steps.day_of_week.outputs.day }}"
-
           if jq -e ".\"$DAY\"" schedule.json > /dev/null 2>&1; then
             SCHEDULE=$(jq -r ".\"$DAY\"[] | \"• \(.time) - \(.subject) (ауд. \(.room))\"" schedule.json)
-            echo "message<<EOF" >> $GITHUB_OUTPUT
-            echo "*РАСПИСАНИЕ НА $DAY*" >> $GITHUB_OUTPUT
-            echo "" >> $GITHUB_OUTPUT
-            echo "$SCHEDULE" >> $GITHUB_OUTPUT
-            echo "EOF" >> $GITHUB_OUTPUT
+            MESSAGE="<b>РАСПИСАНИЕ НА $DAY</b>%0A%0A$SCHEDULE"
           else
-            echo "message=*ПАР НЕТ!* Можно отдохнуть." >> $GITHUB_OUTPUT
+            MESSAGE="<b>ПАР НЕТ!</b> Можно отдохнуть."
           fi
+          # Экранируем для передачи в curl (перенос строки уже %0A)
+          echo "message=$MESSAGE" >> $GITHUB_OUTPUT
 
-      - name: Отправляем в Telegram
+      # ========== ОТПРАВКА С ДИАГНОСТИКОЙ ==========
+      - name: 📨 Отправляем в Telegram
+        env:
+          BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
-            -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
-            -d text="${{ steps.schedule.outputs.message }}" \
-            -d parse_mode="MarkdownV2"
+          if [ -z "$CHAT_ID" ]; then
+            echo "❌ ОШИБКА: CHAT_ID пуст. Проверьте секрет TELEGRAM_CHAT_ID"
+            exit 1
+          fi
+          if [ -z "$BOT_TOKEN" ]; then
+            echo "❌ ОШИБКА: BOT_TOKEN пуст. Проверьте секрет TELEGRAM_BOT_TOKEN"
+            exit 1
+          fi
+          MESSAGE="${{ steps.schedule.outputs.message }}"
+          if [ -z "$MESSAGE" ]; then
+            echo "❌ ОШИБКА: сообщение пустое"
+            exit 1
+          fi
+          echo "Отправляем сообщение в чат $CHAT_ID..."
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
+            -d chat_id="${CHAT_ID}" \
+            -d text="${MESSAGE}" \
+            -d parse_mode="HTML")
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | head -n-1)
+          echo "HTTP код ответа: $HTTP_CODE"
+          echo "Тело ответа Telegram: $BODY"
+          if [ "$HTTP_CODE" -eq 200 ]; then
+            echo "✅ Сообщение успешно отправлено!"
+          else
+            echo "❌ Ошибка отправки. Код: $HTTP_CODE"
+            exit 1
+          fi

@@ -14,10 +14,9 @@ jobs:
       - name: Устанавливаем jq
         run: sudo apt-get update && sudo apt-get install -y jq
 
-      - name: Генерируем сообщение с ежедневным расписанием
+      - name: Генерируем сообщение
         id: message
         run: |
-          # Определяем текущий день недели (пн=1, вт=2, ..., вс=7)
           DOW=$(date +%u)
           case $DOW in
             1) DAY="monday" ;;
@@ -29,14 +28,12 @@ jobs:
             7) DAY="sunday" ;;
           esac
 
-          # Читаем общие цели
           WATER=$(jq -r '.water_daily_goal_ml // 0' config.json)
           STEPS=$(jq -r '.steps_daily_goal // 0' config.json)
           WEEKLY=$(jq -r '.weekly_goal // 0' config.json)
 
           MESSAGE="💪 *Фитнес-трекер* — тренировка на $DAY"$'\n'
 
-          # Берём список упражнений на сегодня
           EX_COUNT=$(jq -r ".weekly_workouts.\"$DAY\" // [] | length" config.json)
           if [ "$EX_COUNT" -gt 0 ]; then
             while IFS= read -r exercise; do
@@ -46,24 +43,20 @@ jobs:
             MESSAGE+="• Сегодня отдых (активное восстановление)"$'\n'
           fi
 
-          # Вода
           if [ "$WATER" != "0" ]; then
             MESSAGE+=$'\n'
             MESSAGE+="💧 *Водный баланс:* выпить ${WATER} мл"$'\n'
           fi
 
-          # Шаги
           if [ "$STEPS" != "0" ]; then
             MESSAGE+="👟 *Шаги:* пройти ${STEPS} шагов"$'\n'
           fi
 
-          # Цель на неделю
           if [ "$WEEKLY" != "0" ]; then
             MESSAGE+=$'\n'
             MESSAGE+="🎯 Цель на неделю: ${WEEKLY} дней тренировок"
           fi
 
-          # Кодируем в URL-формат
           MESSAGE_ENCODED=$(echo -n "$MESSAGE" | jq -sRr @uri)
           echo "text=$MESSAGE_ENCODED" >> $GITHUB_OUTPUT
 

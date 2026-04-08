@@ -14,43 +14,56 @@ jobs:
       - name: Устанавливаем jq
         run: sudo apt-get update && sudo apt-get install -y jq
 
-      - name: Генерируем сообщение
+      - name: Генерируем сообщение с ежедневным расписанием
         id: message
         run: |
-          PROJECT_NAME=$(jq -r '.project_name' config.json)
+          # Определяем текущий день недели (пн=1, вт=2, ..., вс=7)
+          DOW=$(date +%u)
+          case $DOW in
+            1) DAY="monday" ;;
+            2) DAY="tuesday" ;;
+            3) DAY="wednesday" ;;
+            4) DAY="thursday" ;;
+            5) DAY="friday" ;;
+            6) DAY="saturday" ;;
+            7) DAY="sunday" ;;
+          esac
+
+          # Читаем общие цели
           WATER=$(jq -r '.water_daily_goal_ml // 0' config.json)
           STEPS=$(jq -r '.steps_daily_goal // 0' config.json)
           WEEKLY=$(jq -r '.weekly_goal // 0' config.json)
 
-          MESSAGE="💪 *${PROJECT_NAME}* — тренировка на сегодня:"$'\n'
+          MESSAGE="💪 *Фитнес-трекер* — тренировка на $DAY"$'\n'
 
-          # Добавляем упражнения БЕЗ subshell
-          if jq -e '.exercises | length > 0' config.json >/dev/null 2>&1; then
+          # Берём список упражнений на сегодня
+          EX_COUNT=$(jq -r ".weekly_workouts.\"$DAY\" // [] | length" config.json)
+          if [ "$EX_COUNT" -gt 0 ]; then
             while IFS= read -r exercise; do
-              MESSAGE+="• ${exercise}"$'\n'
-            done < <(jq -r '.exercises[]' config.json)
+              MESSAGE+="• $exercise"$'\n'
+            done < <(jq -r ".weekly_workouts.\"$DAY\"[]" config.json)
           else
-            if jq -e '.habits | length > 0' config.json >/dev/null 2>&1; then
-              while IFS= read -r habit; do
-                MESSAGE+="• ${habit}"$'\n'
-              done < <(jq -r '.habits[]' config.json)
-            fi
+            MESSAGE+="• Сегодня отдых (активное восстановление)"$'\n'
           fi
 
+          # Вода
           if [ "$WATER" != "0" ]; then
             MESSAGE+=$'\n'
             MESSAGE+="💧 *Водный баланс:* выпить ${WATER} мл"$'\n'
           fi
 
+          # Шаги
           if [ "$STEPS" != "0" ]; then
             MESSAGE+="👟 *Шаги:* пройти ${STEPS} шагов"$'\n'
           fi
 
+          # Цель на неделю
           if [ "$WEEKLY" != "0" ]; then
             MESSAGE+=$'\n'
             MESSAGE+="🎯 Цель на неделю: ${WEEKLY} дней тренировок"
           fi
 
+          # Кодируем в URL-формат
           MESSAGE_ENCODED=$(echo -n "$MESSAGE" | jq -sRr @uri)
           echo "text=$MESSAGE_ENCODED" >> $GITHUB_OUTPUT
 

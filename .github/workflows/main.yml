@@ -2,91 +2,75 @@ name: Фитнес-трекер
 
 on:
   schedule:
-    # Каждый день в 9:00 UTC (измените час под свой часовой пояс)
     - cron: '0 6 * * *'
-  workflow_dispatch:   # ручной запуск
+  workflow_dispatch:
 
 jobs:
   run:
     runs-on: ubuntu-latest
     steps:
-      - name: Загружаем код репозитория
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Устанавливаем jq
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y jq
-          jq --version   # проверка, что установился
+        run: sudo apt-get update && sudo apt-get install -y jq
 
       - name: Читаем config.json
         id: config
         run: |
           echo "project_name=$(jq -r '.project_name' config.json)" >> $GITHUB_OUTPUT
-          echo "exercises=$(jq -c '.exercises // []' config.json)" >> $GITHUB_OUTPUT
+          # Сохраняем упражнения в отдельный файл, чтобы избежать подстановок
+          jq -c '.exercises // []' config.json > exercises.json
           echo "water_goal=$(jq -r '.water_daily_goal_ml // 0' config.json)" >> $GITHUB_OUTPUT
           echo "steps_goal=$(jq -r '.steps_daily_goal // 0' config.json)" >> $GITHUB_OUTPUT
           echo "weekly_goal=$(jq -r '.weekly_goal // 0' config.json)" >> $GITHUB_OUTPUT
 
-      - name: Генерируем сообщение (исправленная версия)
+      - name: Генерируем сообщение
         id: message
         run: |
-          # Начинаем собирать сообщение
           MESSAGE="💪 *Тренировка на сегодня:*"$'\n'
 
-          # Берём упражнения из JSON (если есть)
-          EXERCISES_JSON='${{ steps.config.outputs.exercises }}'
-          if [ "$EXERCISES_JSON" != "[]" ] && [ "$EXERCISES_JSON" != "null" ]; then
-            # Добавляем каждое упражнение с маркером •
+          # Безопасно читаем упражнения из файла exercises.json
+          if [ -f exercises.json ]; then
             while IFS= read -r exercise; do
               MESSAGE+="• $exercise"$'\n'
-            done < <(echo "$EXERCISES_JSON" | jq -r '.[]')
-          else
-            # Запасной вариант: используем поле habits (если нет exercises)
-            HABITS=$(jq -r '.habits // [] | join(", ")' config.json)
-            if [ -n "$HABITS" ]; then
-              MESSAGE+="• Привычки: $HABITS"$'\n'
-            fi
+            done < <(jq -r '.[]' exercises.json)
           fi
 
-          # Добавляем водный баланс (если цель > 0)
-          WATER='${{ steps.config.outputs.water_goal }}'
+          WATER="${{ steps.config.outputs.water_goal }}"
           if [ "$WATER" != "0" ] && [ "$WATER" != "null" ]; then
             MESSAGE+=$'\n'
             MESSAGE+="💧 *Водный баланс:* выпить ${WATER} мл"$'\n'
           fi
 
-          # Добавляем шаги (если цель > 0)
-          STEPS='${{ steps.config.outputs.steps_goal }}'
+          STEPS="${{ steps.config.outputs.steps_goal }}"
           if [ "$STEPS" != "0" ] && [ "$STEPS" != "null" ]; then
             MESSAGE+="👟 *Шаги:* пройти ${STEPS} шагов"$'\n'
           fi
 
-          # Добавляем цель на неделю (если > 0)
-          WEEKLY='${{ steps.config.outputs.weekly_goal }}'
+          WEEKLY="${{ steps.config.outputs.weekly_goal }}"
           if [ "$WEEKLY" != "0" ] && [ "$WEEKLY" != "null" ]; then
             MESSAGE+=$'\n'
             MESSAGE+="🎯 Цель на неделю: ${WEEKLY} дней тренировок"
           fi
 
-          # Кодируем сообщение для передачи в URL (переводы строк -> %0A)
+          # Кодируем для отправки в Telegram
           MESSAGE_ENCODED=$(echo -n "$MESSAGE" | jq -sRr @uri)
           echo "text=$MESSAGE_ENCODED" >> $GITHUB_OUTPUT
 
-      - name: Проверяем наличие secrets
+      - name: Проверяем secrets
         id: check_secrets
         run: |
           if [ -z "${{ secrets.TELEGRAM_CHAT_ID }}" ]; then
-            echo "Ошибка: TELEGRAM_CHAT_ID не задан в secrets репозитория"
+            echo "Ошибка: TELEGRAM_CHAT_ID не задан"
             exit 1
           fi
           if [ -z "${{ secrets.TELEGRAM_BOT_TOKEN }}" ]; then
-            echo "Ошибка: TELEGRAM_BOT_TOKEN не задан в secrets репозитория"
+            echo "Ошибка: TELEGRAM_BOT_TOKEN не задан"
             exit 1
           fi
           echo "secrets_ok=true" >> $GITHUB_OUTPUT
 
-      - name: Отправляем сообщение в Telegram
+      - name: Отправляем в Telegram
         if: steps.check_secrets.outputs.secrets_ok == 'true'
         run: |
           curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
@@ -94,11 +78,11 @@ jobs:
             -d text="${{ steps.message.outputs.text }}" \
             -d parse_mode="Markdown"
 
-      - name: Сохраняем историю (лог-файл)
+      - name: Сохраняем историю
         run: |
           echo "$(date -u '+%Y-%m-%d %H:%M:%S UTC'): Запуск выполнен" >> history.log
           git config user.email "github-actions@github.com"
           git config user.name "GitHub Actions"
           git add history.log
           git commit -m "Обновление истории $(date -u '+%Y-%m-%d %H:%M:%S')" || echo "Нет изменений"
-          git push || echo "Не удалось запушить (возможно, нет прав на запись)"
+          git push || echo "Не удалось запушить"

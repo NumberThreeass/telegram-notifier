@@ -14,46 +14,43 @@ jobs:
       - name: Устанавливаем jq
         run: sudo apt-get update && sudo apt-get install -y jq
 
-      - name: Читаем config.json
-        id: config
-        run: |
-          echo "project_name=$(jq -r '.project_name' config.json)" >> $GITHUB_OUTPUT
-          # Сохраняем упражнения в отдельный файл, чтобы избежать подстановок
-          jq -c '.exercises // []' config.json > exercises.json
-          echo "water_goal=$(jq -r '.water_daily_goal_ml // 0' config.json)" >> $GITHUB_OUTPUT
-          echo "steps_goal=$(jq -r '.steps_daily_goal // 0' config.json)" >> $GITHUB_OUTPUT
-          echo "weekly_goal=$(jq -r '.weekly_goal // 0' config.json)" >> $GITHUB_OUTPUT
-
       - name: Генерируем сообщение
         id: message
         run: |
-          MESSAGE="💪 *Тренировка на сегодня:*"$'\n'
+          PROJECT_NAME=$(jq -r '.project_name' config.json)
+          WATER=$(jq -r '.water_daily_goal_ml // 0' config.json)
+          STEPS=$(jq -r '.steps_daily_goal // 0' config.json)
+          WEEKLY=$(jq -r '.weekly_goal // 0' config.json)
 
-          # Безопасно читаем упражнения из файла exercises.json
-          if [ -f exercises.json ]; then
+          MESSAGE="💪 *${PROJECT_NAME}* — тренировка на сегодня:"$'\n'
+
+          # Добавляем упражнения БЕЗ subshell
+          if jq -e '.exercises | length > 0' config.json >/dev/null 2>&1; then
             while IFS= read -r exercise; do
-              MESSAGE+="• $exercise"$'\n'
-            done < <(jq -r '.[]' exercises.json)
+              MESSAGE+="• ${exercise}"$'\n'
+            done < <(jq -r '.exercises[]' config.json)
+          else
+            if jq -e '.habits | length > 0' config.json >/dev/null 2>&1; then
+              while IFS= read -r habit; do
+                MESSAGE+="• ${habit}"$'\n'
+              done < <(jq -r '.habits[]' config.json)
+            fi
           fi
 
-          WATER="${{ steps.config.outputs.water_goal }}"
-          if [ "$WATER" != "0" ] && [ "$WATER" != "null" ]; then
+          if [ "$WATER" != "0" ]; then
             MESSAGE+=$'\n'
             MESSAGE+="💧 *Водный баланс:* выпить ${WATER} мл"$'\n'
           fi
 
-          STEPS="${{ steps.config.outputs.steps_goal }}"
-          if [ "$STEPS" != "0" ] && [ "$STEPS" != "null" ]; then
+          if [ "$STEPS" != "0" ]; then
             MESSAGE+="👟 *Шаги:* пройти ${STEPS} шагов"$'\n'
           fi
 
-          WEEKLY="${{ steps.config.outputs.weekly_goal }}"
-          if [ "$WEEKLY" != "0" ] && [ "$WEEKLY" != "null" ]; then
+          if [ "$WEEKLY" != "0" ]; then
             MESSAGE+=$'\n'
             MESSAGE+="🎯 Цель на неделю: ${WEEKLY} дней тренировок"
           fi
 
-          # Кодируем для отправки в Telegram
           MESSAGE_ENCODED=$(echo -n "$MESSAGE" | jq -sRr @uri)
           echo "text=$MESSAGE_ENCODED" >> $GITHUB_OUTPUT
 

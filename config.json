@@ -1,0 +1,12 @@
+{
+  "project_name": "Фитнес-трекер",
+  "exercises": [
+    "Приседания: 3x15",
+    "Отжимания: 3x10",
+    "Планка: 3x30 сек"
+  ],
+  "water_daily_goal_ml": 2000,
+  "steps_daily_goal": 8000,
+  "reminder_time": "09:00",
+  "weekly_goal": 5
+}
